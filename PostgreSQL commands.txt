@@ -1,0 +1,178 @@
+
+/*1.Create Database*/
+-- Database: netflix
+-- DROP DATABASE IF EXISTS netflix;
+CREATE DATABASE netflix
+    WITH
+    OWNER = postgres
+    ENCODING = 'UTF8'
+    LC_COLLATE = 'Spanish_Peru.1252'
+    LC_CTYPE = 'Spanish_Peru.1252'
+    TABLESPACE = pg_default
+    CONNECTION LIMIT = -1
+    IS_TEMPLATE = False;
+
+COMMENT ON DATABASE netflix
+    IS 'Cleaning and Analysis';
+
+/*2.Create Table*/
+
+--DROP TABLE IF EXISTS public.data_netflix;--
+CREATE TABLE IF NOT EXISTS public.data_netflix
+(
+    show_id character varying(10) COLLATE pg_catalog."default" NOT NULL,
+    type_movie character varying(10) COLLATE pg_catalog."default",
+    title character varying(500) COLLATE pg_catalog."default",
+    director character varying(500) COLLATE pg_catalog."default",
+    cast_movie character varying(1000) COLLATE pg_catalog."default",
+    country character varying(200) COLLATE pg_catalog."default",
+    date_added character varying(20) COLLATE pg_catalog."default",
+    release_year character varying(20) COLLATE pg_catalog."default",
+    rating character varying(10) COLLATE pg_catalog."default",
+    duration character varying(20) COLLATE pg_catalog."default",
+    listed_in character varying(100) COLLATE pg_catalog."default",
+    description character varying(1000) COLLATE pg_catalog."default",
+    CONSTRAINT data_netflix_pkey PRIMARY KEY (show_id)
+)
+
+TABLESPACE pg_default;
+
+ALTER TABLE IF EXISTS public.data_netflix
+    OWNER to postgres;
+
+/*3.Import DataSet*/
+
+--Load data from csv--
+--Set your especific path--
+COPY data_netflix(
+    show_id,
+    type_movie,
+    title,
+    director,
+	cast_movie,
+	country,
+	date_added,
+	release_year,
+	rating,
+	duration,
+	listed_in,
+	description
+)
+FROM 'E:/Downloads/Data Cleaning and visualization/netflix_titles.csv' 
+DELIMITER ','
+csv HEADER;
+
+--Check data--
+SELECT * FROM public.data_netflix;
+
+/*4.Data Cleaning*/
+
+--Check duplicates--
+SELECT show_id, COUNT(*)
+FROM public.data_netflix
+GROUP BY show_id
+ORDER BY show_id DESC;
+
+--Update "director" and "country" column including only a single value --
+UPDATE public.data_netflix
+SET director = SPLIT_PART(director,',',1),
+country = SPLIT_PART(country,',',1);
+
+--Check updated database--
+SELECT * FROM public.data_netflix;
+
+--Check null values--
+SELECT COUNT(*) FILTER (WHERE show_id IS NULL) AS showid_nulls,
+       COUNT(*) FILTER (WHERE type_movie IS NULL) AS type_movie_nulls,
+       COUNT(*) FILTER (WHERE title IS NULL) AS title_nulls,
+       COUNT(*) FILTER (WHERE director IS NULL) AS director_nulls,
+       COUNT(*) FILTER (WHERE cast_movie IS NULL) AS cast_movie_nulls,
+       COUNT(*) FILTER (WHERE country IS NULL) AS country_nulls,
+       COUNT(*) FILTER (WHERE date_added IS NULL) AS date_addes_nulls,
+       COUNT(*) FILTER (WHERE release_year IS NULL) AS release_year_nulls,
+       COUNT(*) FILTER (WHERE rating IS NULL) AS rating_nulls,
+       COUNT(*) FILTER (WHERE duration IS NULL) AS duration_nulls,
+       COUNT(*) FILTER (WHERE listed_in IS NULL) AS listed_in_nulls,
+       COUNT(*) FILTER (WHERE description IS NULL) AS description_nulls
+FROM public.data_netflix;
+
+
+--Copy “director” values using the “cast_movie” column--
+UPDATE public.data_netflix
+SET director = data2.director
+FROM public.data_netflix AS data2
+WHERE public.data_netflix. cast_movie = data2. cast_movie
+AND public.data_netflix.show_id <> data2.show_id 
+AND public.data_netflix.director IS NULL; 
+
+
+--Complete remaining missing values in "director" as 'not available'--
+UPDATE public.data_netflix
+SET director = 'not available'
+WHERE director IS NULL;
+
+--Check country nulls--
+SELECT * FROM public.data_netflix
+WHERE country is NULL;
+
+--Copy the country using the director column--
+UPDATE public.data_netflix
+SET country = data2.country
+FROM public.data_netflix AS data2
+WHERE public.data_netflix.director = data2.director 
+AND public.data_netflix.show_id <> data2.show_id 
+AND public.data_netflix.country IS NULL;
+
+--Complete all NULL "country" as 'not available'--
+UPDATE public.data_netflix
+SET country = 'not available'
+WHERE country IS NULL;
+
+--Show date_added nulls---
+SELECT show_id, title, director, country,date_added
+FROM public.data_netflix
+WHERE date_added IS NULL;
+
+--DELETE rows with "data_added" nulls-- 
+DELETE FROM public.data_netflix
+WHERE date_added IS NULL;
+
+--Show "rating" nulls---
+SELECT show_id, title, director, country,rating
+FROM public.data_netflix
+WHERE rating IS NULL;
+
+--DELETE rows with "rating" nulls-- 
+DELETE FROM public.data_netflix
+WHERE rating IS NULL;
+
+--Show "duration" nulls---
+SELECT show_id, title, director, country,duration
+FROM public.data_netflix
+WHERE duration IS NULL;
+
+--DELETE rows with "duration" nulls-- 
+DELETE FROM public.data_netflix
+WHERE duration IS NULL;
+
+--DROP unneeded columns--
+ALTER TABLE public.data_netflix
+DROP COLUMN cast_movie, 
+DROP COLUMN description;
+
+--Check total nulls values in all columns--
+SELECT count(*) filter (where show_id IS NULL) AS showid_nulls,
+       count(*) filter (where type_movie IS NULL) AS type_movie_nulls,
+       count(*) filter (where title IS NULL) AS title_nulls,
+       count(*) filter (where director IS NULL) AS director_nulls,
+       count(*) filter (where country IS NULL) AS country_nulls,
+       count(*) filter (where date_added IS NULL) AS date_addes_nulls,
+       count(*) filter (where release_year IS NULL) AS release_year_nulls,
+       count(*) filter (where rating IS NULL) AS rating_nulls,
+       count(*) filter (where duration IS NULL) AS duration_nulls,
+       count(*) filter (where listed_in IS NULL) AS listed_in_nulls
+FROM public.data_netflix; 
+
+--Change date Order from 'Month DD,YYYY' to 'DD-MM-YYYY' --
+UPDATE public.data_netflix
+SET date_added = to_char(to_date(date_added, 'Month DD,YYYY'),'DD-MM-YYYY');

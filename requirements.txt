@@ -1,0 +1,2 @@
+pgadmin4_version=6.19
+power_bi_version=2.112.1161.0 64-bit
